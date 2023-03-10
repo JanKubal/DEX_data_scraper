@@ -6,6 +6,8 @@ import json
 # specify the JSON file
 url = 'https://www.dextools.io/chain-ethereum/api/Uniswap/history/candles?sym=usd&span=month&pair=0x4e68ccd3e89f51c3074ca5072bbac773960dfa36&ts=1677020400000&v=1662994304076&res=15m&timezone=1'
 
+url = 'https://www.dextools.io/chain-ethereum/api/Uniswap/history/candles?sym=usd&span=month&pair=0x4e68ccd3e89f51c3074ca5072bbac773960dfa36&ts=1627772400000&v=1662994304076&res=15m&timezone=1'
+
 
 #headers for the json, kudos ChatGPT
 headers = {
