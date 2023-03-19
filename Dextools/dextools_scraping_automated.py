@@ -49,7 +49,7 @@ def scrape_data(pair):
     driver.execute_script("arguments[0].click();", apply_filter_button) #applying filter
     time.sleep(0.5)
 
-    while page < 3: #only temporary, change to True later
+    while page < 2: #only temporary, change to True later
 
         page += 1
 
@@ -114,6 +114,39 @@ def data_transform_save(data, pair):
     df = pd.DataFrame(data, columns=columns)#, dtype = dtypes)
 
     df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S')
+    df['price_USD'] = df['price_USD'].str.replace('$', '')
+
+    #dictionary for subscript replacements
+    replacements = {
+    '₀': 0*'0', 
+    '₁': 1*'0', 
+    '₂': 2*'0', 
+    '₃': 3*'0',
+    '₄': 4*'0',
+    '₅': 5*'0',
+    '₆': 6*'0',
+    '₇': 7*'0',
+    '₈': 8*'0',
+    '₉': 9*'0',
+    '₁₀': 10*'0',
+    '₁₁': 11*'0',
+    '₁₂': 12*'0',
+    '₁₃': 13*'0',
+    '₁₄': 14*'0',
+    '₁₅': 15*'0',
+    '₁₆': 16*'0',
+    '₁₇': 17*'0',
+    '₁₈': 18*'0',
+    '₁₉': 19*'0',
+    '₂₀': 20*'0',
+    }
+
+    #replacing subscripts with numbers 
+    for subscripted, zeros in replacements.items():
+        df['price_USD'] = df['price_USD'].str.replace(subscripted, zeros)
+        df['price_native'] = df['price_native'].str.replace(subscripted, zeros)
+        df['amount_token'] = df['amount_token'].str.replace(subscripted, zeros)
+        df['amount_native'] = df['amount_native'].str.replace(subscripted, zeros)
 
 
     return df
@@ -128,9 +161,18 @@ if __name__ == '__main__':
     # args = parser.parse_args()
     # print(args.arg1, args.arg2)
 
-    pair_list = [("SHIB/WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x811beed0119b4afce20d2583eb608c6f7af1954f")]#, 
-                #("HEX/WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x55d5c232d921b9eaa6b37b5845e439acd04b4dba")] #here continue and write all pairs
-
+    pair_list = [
+                ("SHIB-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x811beed0119b4afce20d2583eb608c6f7af1954f")#,
+                # ("HEX-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x55d5c232d921b9eaa6b37b5845e439acd04b4dba"),
+                # ("AGIX-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0xe45b4a84e0ad24b8617a489d743c52b84b7acebe"),
+                # ("OPTIMUS-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x8de7a9540e0edb617d78ca5a7c6cc18295fd8bb9"),
+                # ("SHIK-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x0b9f5cef1ee41f8cccaa8c3b4c922ab406c980cc"),
+                # ("INJ-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0x1bdcebca3b93af70b58c41272aea2231754b23ca"),
+                # ("VOLT-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0x487bfe79c55ac32785c66774b597699e092d0cd9"),
+                # ("MBOX-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0x8fa59693458289914db0097f5f366d771b7a7c3f"),
+                # ("FLOKI-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0x231d9e7181e8479a8b40930961e93e7ed798542c"),
+                # ("BabyDoge-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0xc736ca3d9b1e90af4230bd8f9626528b3d4e0ee0")
+                ]
 
     #loop through the pairs to scrape
     for pair in pair_list:
@@ -141,9 +183,13 @@ if __name__ == '__main__':
         for i in range(5):
             print(data[i])
 
+        # for i in data:
+        #     print(i)
+
         df = data_transform_save(data, pair)
-        print(df.head())
-        print(df.info())
+        print(df.head(15))
+        #print(df.info())
+        print(pair[0])
         print(df.describe())
 
 
@@ -157,4 +203,5 @@ if __name__ == '__main__':
 #TODO list
 # transform data to correct formats - to be continued, resolve the zeros in subscript
 # transform into pd.df
-# save dataframe with specific name            
+# save dataframe with specific name   
+# perhaps work out some tests?         
