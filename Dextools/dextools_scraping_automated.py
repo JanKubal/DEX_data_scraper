@@ -2,6 +2,7 @@ import argparse
 import pandas as pd
 import requests
 import datetime
+import os
 
 import time
 from selenium import webdriver
@@ -16,7 +17,6 @@ from selenium.webdriver.common.by import By
 
 #define the scraping function
 def scrape_data(pair):
-    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     url = pair[1]
 
     options = Options()
@@ -49,7 +49,7 @@ def scrape_data(pair):
     driver.execute_script("arguments[0].click();", apply_filter_button) #applying filter
     time.sleep(0.5)
 
-    while page < 5: #only temporary, change to True later
+    while True: #page < 2: #only temporary, change to True later
 
         page += 1
 
@@ -159,6 +159,21 @@ def data_transform_save(data, pair):
     return df
 
 
+def save_dataframe_to_csv(dataframe, name): #saving dataframe to specific location
+    # Create directory if it doesn't exist
+    directory = os.path.join(os.getcwd(), 'scraped_data', name)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+    # Create filename with current time
+    time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"{name}_{time_str}.csv"
+    filepath = os.path.join(directory, filename)
+    
+    # Save dataframe to CSV
+    dataframe.to_csv(filepath, index=False)
+
+
 
 if __name__ == '__main__':
     # Set up command line arguments with default values
@@ -199,7 +214,8 @@ if __name__ == '__main__':
         print(pair[0])
         print(df.describe())
 
-        df.to_csv("SHIB-WETH.csv", index=False)
+        #df.to_csv("SHIB-WETH.csv", index=False)
+        save_dataframe_to_csv(df, pair[0])
 
 
 
