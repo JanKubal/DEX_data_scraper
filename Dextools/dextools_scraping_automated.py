@@ -53,7 +53,7 @@ def scrape_data(pair):
 
         page += 1
 
-        if page%2 == 0:
+        if page%10 == 0:
             print('--- page:', page, '---')
         #print("before scrolling to view")
         # get table
@@ -173,6 +173,64 @@ def save_dataframe_to_csv(dataframe, name): #saving dataframe to specific locati
     # Save dataframe to CSV
     dataframe.to_csv(filepath, index=False)
 
+def log_scraping_start():
+    # Define the path to the logs file
+    logs_path = os.path.join(os.getcwd(), "scraped_data", "logs.txt")
+    dir_path = os.path.join(os.getcwd(), "scraped_data")
+
+    # Create the scraped_data folder if it doesn't exist
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+
+    # Get the current time
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+    # Open the logs file for appending
+    with open(logs_path, "a") as f:
+        # Write a separator line
+        f.write("--------------\n")
+        # Write the scraping start message with the current time
+        f.write(f"Scraping starts at {current_time}\n")
+    
+    return current_time
+
+def log_scraping_end(start_time):
+    # Define the path to the logs file
+    logs_path = os.path.join(os.getcwd(), "scraped_data", "logs.txt")
+
+    # Get the end time and duration
+    end_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    elapsed_time = datetime.datetime.strptime(end_time, '%Y-%m-%d_%H-%M-%S') - datetime.datetime.strptime(start_time, '%Y-%m-%d_%H-%M-%S')
+
+    # Open the logs file for appending
+    with open(logs_path, "a") as f:
+        # Write the scraping end message with the current time and duration
+        f.write(f"Scraping ends at {end_time}, taking {elapsed_time}.\n")
+
+def log_scraped_pair(df, name):
+    # Define the path to the logs file
+    logs_path = os.path.join(os.getcwd(), "scraped_data", "logs.txt")
+
+    # Get the number of non-NA observations in the third column
+    n = df.iloc[:, 2].count()
+
+    # Get the first and last cells of the first column as datetime objects
+    time1 = df.iloc[0, 0]
+    time2 = df.iloc[-1, 0]
+
+    # Open the logs file for appending
+    with open(logs_path, "a") as f:
+        # Write the message to the file
+        f.write(f" - {name} scraped with {n} observations, ranging from {time1} to {time2}.\n")    
+
+def log_scraping_fail(attempts, name, exception):        
+    # Define the path to the logs file
+    logs_path = os.path.join(os.getcwd(), "scraped_data", "logs.txt")
+
+    # Open the logs file for appending
+    with open(logs_path, "a") as f:
+        # Write the scraping fail log and exception
+        f.write(f"  --  Scraping {name} failed after {attempts} attempts.\n Exception: {exception}. \n")
 
 
 if __name__ == '__main__':
@@ -195,38 +253,41 @@ if __name__ == '__main__':
                 ("FLOKI-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0x231d9e7181e8479a8b40930961e93e7ed798542c"),
                 ("BabyDoge-WBNB", "https://www.dextools.io/app/en/bnb/pair-explorer/0xc736ca3d9b1e90af4230bd8f9626528b3d4e0ee0")
                 ]
+    
+    #loging the start of scraping
+    start_time = log_scraping_start()
 
     #loop through the pairs to scrape
     for pair in pair_list:
 
-        attempts = 3
+        attempts = 10
         for i in range(attempts):
 
             try:
+                #scraping data
                 data = scrape_data(pair)
 
-                print(len(data))
-                for i in range(5):
-                    print(data[i])
-
-                # for i in data:
-                #     print(i)
-
+                #transforming data into pd.df
                 df = data_transform_save(data, pair)
-                print(df.iloc[:, 0:6].head(15))
-                print(df.info())
-                print(pair[0])
-                print(df.describe())
 
-                #df.to_csv("SHIB-WETH.csv", index=False)
+                #saving dataframe
                 save_dataframe_to_csv(df, pair[0])
-                break
 
+                #logging the saved data
+                log_scraped_pair(df, pair[0])
+                break
+            
+            #try to run the scrape 'attempts' times
             except Exception as e:
                 if i < attempts - 1:
                     print(f"Attempt {i+1} failed with error: {e}")
                 else:
-                    raise Exception("Function failed after multiple attempts")
+                    log_scraping_fail(attempts, pair[0], e)
+                    #not want to terminate program - commenting out the 'rise Exception' block
+                    #raise Exception(f"Function failed after {attempts} attempts")
+    
+    #loging the end of scraping
+    log_scraping_end(start_time)
 
 
 
