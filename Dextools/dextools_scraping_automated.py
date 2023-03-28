@@ -54,7 +54,7 @@ def scrape_data(pair):
         page += 1
 
         if page%10 == 0:
-            print('--- page:', page, '---')
+            print('--- page:', page, '--- of ', pair[0])
         #print("before scrolling to view")
         # get table
         tableElement = WebDriverWait(driver, 10).until(
