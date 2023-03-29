@@ -226,3 +226,16 @@ Scraping starts at 2023-03-28_19-02-05
   --  Scraping BabyDoge-WBNB failed after 10 attempts.
  Exception: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)). 
 Scraping ends at 2023-03-28_22-22-09, taking 3:20:04.
+--------------
+Scraping starts at 2023-03-29_07-05-04
+ - SHIB-WETH scraped with 1515 observations, ranging from 2023-03-29 06:57:59 to 2023-03-22 11:55:11.
+ - HEX-WETH scraped with 1485 observations, ranging from 2023-03-29 07:19:59 to 2023-03-27 17:43:59.
+ - AGIX-WETH scraped with 1530 observations, ranging from 2023-03-29 07:38:23 to 2023-03-20 21:03:11.
+ - OPTIMUS-WETH scraped with 1515 observations, ranging from 2023-03-29 07:50:11 to 2023-03-25 21:13:11.
+ - SHIK-WETH scraped with 1335 observations, ranging from 2023-03-29 08:10:23 to 2023-03-22 05:54:59.
+ - INJ-WBNB scraped with 1515 observations, ranging from 2023-03-29 08:23:49 to 2023-03-24 15:02:35.
+ - VOLT-WBNB scraped with 1530 observations, ranging from 2023-03-29 08:40:37 to 2023-03-29 00:23:03.
+ - MBOX-WBNB scraped with 1530 observations, ranging from 2023-03-29 08:54:34 to 2023-03-27 12:10:08.
+ - FLOKI-WBNB scraped with 1560 observations, ranging from 2023-03-29 09:08:28 to 2023-03-28 10:27:04.
+ - BabyDoge-WBNB scraped with 1530 observations, ranging from 2023-03-29 09:34:28 to 2023-03-27 15:08:40.
+Scraping ends at 2023-03-29_09-50-12, taking 2:45:08.
