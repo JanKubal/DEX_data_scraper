@@ -23,13 +23,12 @@ def scrape_data(pair):
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),
                             options=options)
     driver.get(url)
-
     page = 0 #page iterator
     all_results = [] #list for all rows
 
     #apply filtering for no bots
     filter_button = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, '//a[@class="d-inline-block wallet-filter-modal ng-tns-c168-3"]'))
+        EC.presence_of_element_located((By.XPATH, '//a[@class="d-inline-block wallet-filter-modal ng-tns-c169-3"]'))
     )
     #filter_button = driver.find_element(By.XPATH, '//a[@class="d-inline-block wallet-filter-modal ng-tns-c168-3"]')
     driver.execute_script("arguments[0].click();", filter_button) #opening filter window
@@ -242,8 +241,8 @@ if __name__ == '__main__':
     # print(args.arg1, args.arg2)
 
     pair_list = [
-                #("SHIB-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x811beed0119b4afce20d2583eb608c6f7af1954f", 50),
-                #("HEX-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x55d5c232d921b9eaa6b37b5845e439acd04b4dba", 100),
+                ("SHIB-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x811beed0119b4afce20d2583eb608c6f7af1954f", 50),
+                ("HEX-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x55d5c232d921b9eaa6b37b5845e439acd04b4dba", 100),
                 ("AGIX-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0xe45b4a84e0ad24b8617a489d743c52b84b7acebe", 40),
                 ("OPTIMUS-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x8de7a9540e0edb617d78ca5a7c6cc18295fd8bb9", 70),
                 ("SHIK-WETH", "https://www.dextools.io/app/en/ether/pair-explorer/0x0b9f5cef1ee41f8cccaa8c3b4c922ab406c980cc", 60),
