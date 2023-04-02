@@ -364,3 +364,9 @@ Scraping starts at 2023-04-02_17-22-24
  - FLOKI-WBNB scraped with 1545 observations, ranging from 2023-04-02 18:42:36 to 2023-04-02 03:38:21.
  - BabyDoge-WBNB scraped with 1530 observations, ranging from 2023-04-02 19:01:28 to 2023-04-01 16:40:11.
 Scraping ends at 2023-04-02_19-18-02, taking 1:55:38.
+--------------
+Scraping starts at 2023-04-02_21-36-44
+ - INJ-WBNB scraped with 750 observations, ranging from 2023-04-02 21:36:06 to 2023-04-01 19:01:23.
+ - FLOKI-WBNB scraped with 1200 observations, ranging from 2023-04-02 21:43:30 to 2023-04-02 07:05:07.
+ - BabyDoge-WBNB scraped with 1200 observations, ranging from 2023-04-02 21:54:22 to 2023-04-01 23:32:56.
+Scraping ends at 2023-04-02_22-06-36, taking 0:29:52.
