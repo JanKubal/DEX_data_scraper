@@ -338,3 +338,16 @@ Scraping starts at 2023-04-01_18-58-47
  - FLOKI-WBNB scraped with 1530 observations, ranging from 2023-04-01 20:21:50 to 2023-03-31 14:10:38.
  - BabyDoge-WBNB scraped with 1530 observations, ranging from 2023-04-01 20:39:18 to 2023-03-31 21:17:22.
 Scraping ends at 2023-04-01_20-54-26, taking 1:55:39.
+--------------
+Scraping starts at 2023-04-02_07-02-33
+ - SHIB-WETH scraped with 750 observations, ranging from 2023-04-02 06:56:35 to 2023-03-29 03:07:23.
+ - HEX-WETH scraped with 1500 observations, ranging from 2023-04-02 07:07:23 to 2023-03-30 19:25:11.
+ - AGIX-WETH scraped with 600 observations, ranging from 2023-04-02 07:20:23 to 2023-03-27 03:49:35.
+ - OPTIMUS-WETH scraped with 1050 observations, ranging from 2023-04-02 07:23:59 to 2023-03-30 10:08:35.
+ - SHIK-WETH scraped with 900 observations, ranging from 2023-04-02 07:37:23 to 2023-03-27 09:33:59.
+ - INJ-WBNB scraped with 750 observations, ranging from 2023-04-02 07:45:07 to 2023-04-01 08:31:17.
+ - VOLT-WBNB scraped with 1560 observations, ranging from 2023-04-02 07:49:39 to 2023-03-31 13:19:31.
+ - MBOX-WBNB scraped with 1350 observations, ranging from 2023-04-02 08:08:54 to 2023-03-30 14:41:35.
+ - FLOKI-WBNB scraped with 1515 observations, ranging from 2023-04-02 08:18:42 to 2023-04-01 14:06:29.
+ - BabyDoge-WBNB scraped with 1545 observations, ranging from 2023-04-02 08:32:48 to 2023-04-01 06:15:52.
+Scraping ends at 2023-04-02_08-48-20, taking 1:45:47.
