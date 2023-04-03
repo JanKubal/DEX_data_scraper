@@ -33,8 +33,9 @@ def save_dataframe_to_csv(dataframe, name): #saving dataframe to specific locati
         os.makedirs(directory)
         
     # Create filename with current time
-    time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    filename = f"{name}_complete_{time_str}.csv"
+    #time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    #filename = f"{name}_complete_{time_str}.csv" #time not needed anymore
+    filename = f"{name}_complete.csv"
     filepath = os.path.join(directory, filename)
     
     # Save dataframe to CSV
