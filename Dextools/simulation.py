@@ -6,6 +6,7 @@ from scipy.stats import skew, kurtosis
 from scipy.stats import halfgennorm, pareto, exponnorm, lognorm, expon
 from scipy.special import expit, logit
 from statsmodels.stats.stattools import durbin_watson
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 #number of steps
 steps = 2000#25000
@@ -28,7 +29,7 @@ def generate_swapped_amount(method = 'exponnorm'):
     #Very simple now, to be included: various distributions, some scale operator?
     if method == 'exponnorm':
         while True:
-            x = exponnorm.rvs(K=4, loc=100, scale=100, size=1)
+            x = exponnorm.rvs(K=4, loc=150, scale=150, size=1)
             if x > 0:
                 return float(x)
 
@@ -67,8 +68,8 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None,
 
 def compute_statistics(series):
     data = {
-        'Statistic': ['Mean', 'Median', 'Variance', 'Skewness', 'Exc.Kurt.'],
-        'Value': [np.mean(series), np.median(series), np.var(series), skew(series), kurtosis(series, fisher=True)]
+        'Statistic': ['Mean', 'Median', 'St.Dev.', 'Skewness', 'Exc.Kurt.'],
+        'Value': [np.mean(series), np.median(series), np.std(series), skew(series), kurtosis(series, fisher=True)]
     }
     df = pd.DataFrame(data)
     return df
@@ -107,7 +108,10 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
         transaction_size = generate_swapped_amount(method = 'exponnorm')
         
         # Generate random transaction type (buy or sell)
-        is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i)
+        #setting custom AR parameters
+        #AR_parameter = [0.1,0.08,0.06]
+        AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
+        is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i)#, AR_parameters=AR_parameter)
 
         # Calculate price of transaction
         price.append(y_balance/x_balance)
@@ -183,6 +187,7 @@ if __name__ == "__main__":
     # Plot Y in the second subplot
     axs[1].plot(returns)
     axs[1].set_title('Returns')
+    axs[1].tick_params(axis='x', rotation=45)
 
     axs[2].hist(returns, bins = 100)
     axs[2].set_title('Returns Histogram')
@@ -191,8 +196,21 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
 
+    f, ax = plt.subplots(nrows=1, ncols=2, figsize=(10,5))
+    plot_acf(returns, lags=35, ax=ax[0], title = "Returns")
+    plot_acf(np.abs(returns), lags=35, ax=ax[1], title = "Absolute Returns")
+    limit = 0.5
+    ax[0].set_ylim([-1*limit,limit]) 
+    ax[1].set_ylim([-1*limit,limit]) 
 
-
+    plt.tight_layout()
+    plt.show()
+    
+    ###Here is where I left of in the simulation. Currently, I get ok distribution of returns, but 
+    # and the DW test is good, but the ACF function show autocorr of returns and for absolute returns (????)
+    # autocorr. of returns is caused by the AR effects.
+    # TODO next: try creating some mechanism for large transaction detection and reaction. 
+    # This might lead to autocorr of absolute returns.
 
     # print(returns.head(10))
     # print(returns.tail(10))
