@@ -210,7 +210,7 @@ if __name__ == "__main__":
     # and the DW test is good, but the ACF function show autocorr of returns and for absolute returns (????)
     # autocorr. of returns is caused by the AR effects.
     # TODO next: try creating some mechanism for large transaction detection and reaction. 
-    # This might lead to autocorr of absolute returns.
+    # This might lead to autocorr of absolute returns. Perhaps also try slippage
 
     # print(returns.head(10))
     # print(returns.tail(10))
