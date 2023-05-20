@@ -1,8 +1,11 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import halfgennorm, pareto, exponnorm, lognorm
 import pandas as pd
+import matplotlib.pyplot as plt
+
+from scipy.stats import skew, kurtosis
+from scipy.stats import halfgennorm, pareto, exponnorm, lognorm
 from scipy.special import expit, logit
+from statsmodels.stats.stattools import durbin_watson
 
 #number of steps
 steps = 2000#25000
@@ -62,62 +65,110 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None,
             #Here I left of. I added the autoregressive element to the BUY/SELL formation process. #TODO next - analyze what I can infer from the simulation, try some testing (??), write email to LK
             return expit(probability) >= 0.5
 
+def compute_statistics(series):
+    data = {
+        'Statistic': ['Mean', 'Median', 'Variance', 'Skewness', 'Exc.Kurt.'],
+        'Value': [np.mean(series), np.median(series), np.var(series), skew(series), kurtosis(series, fisher=True)]
+    }
+    df = pd.DataFrame(data)
+    return df
 
-# Run simulation for 1000 steps
-for i in range(steps):
-    # Generate random time between swaps from exponential distribution
-    time_to_next_swap = np.random.exponential(scale=1)
-    
-    # Generate random transaction size from normal distribution
-    transaction_size = generate_swapped_amount(method = 'exponnorm')
-    
-    # Generate random transaction type (buy or sell)
-    is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i)
+def compute_DW_test(returns):
+    dw_returns = durbin_watson(returns)
+    dw_abs_returns = durbin_watson(np.abs(returns))
+    in_range_ret = "*" if 1.5 < dw_returns < 2.5 else ""
+    in_range_abs = "*" if dw_abs_returns < 1.5 else ""
 
-    # Calculate price of transaction
-    price.append(y_balance/x_balance)
+    data = {
+        'returns': [dw_returns, in_range_ret],
+        'absolute returns': [dw_abs_returns, in_range_abs]
+    }
+    DW_result = pd.DataFrame(data)
+    return DW_result
 
-    # Calculate new balances based on transaction
-    if is_buy:
-        x_balance += transaction_size
-        y_balance = k / x_balance
-    else:
-        x_balance -= transaction_size
-        y_balance = k / x_balance
-    
-    # Append results to arrays
-    times.append(time_to_next_swap)
-    tokens_swapped.append(transaction_size)
-    x_balances.append(x_balance)
-    y_balances.append(y_balance)
-    swap_types.append(int(is_buy))
-    
-    
-# Print final balances of tokens in the AMM pool
-print("Final balances:")
-print(f"Token X: {x_balances[-1]}")
-print(f"Token Y: {y_balances[-1]}")
+def run_simulation(steps = 100, x_balance = 1000000, y_balance = 10000):
+    # Set the AMM equation
+    k = x_balance * y_balance
 
-# Calculate returns
-arr = np.array(price)
-returns = np.diff(arr) / arr[:-1]
+    # Set up arrays to store results
+    times = []
+    tokens_swapped = []
+    x_balances = []
+    y_balances = []
+    price = []
+    swap_types = []
 
-# Plot the price and returns
-# Create a figure with two subplots
-fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    # Run simulation for 1000 steps
+    for i in range(steps):
+        # Generate random time between swaps from exponential distribution
+        time_to_next_swap = np.random.exponential(scale=1)
+        
+        # Generate random transaction size from normal distribution
+        transaction_size = generate_swapped_amount(method = 'exponnorm')
+        
+        # Generate random transaction type (buy or sell)
+        is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i)
 
-# Plot X in the first subplot
-axs[0].plot(price)
-axs[0].set_title('Price')
+        # Calculate price of transaction
+        price.append(y_balance/x_balance)
 
-# Plot Y in the second subplot
-axs[1].plot(returns)
-axs[1].set_title('Returns')
+        # Calculate new balances based on transaction
+        if is_buy:
+            x_balance += transaction_size
+            y_balance = k / x_balance
+        else:
+            x_balance -= transaction_size
+            y_balance = k / x_balance
+        
+        # Append results to arrays
+        times.append(time_to_next_swap)
+        tokens_swapped.append(transaction_size)
+        x_balances.append(x_balance)
+        y_balances.append(y_balance)
+        swap_types.append(int(is_buy))
 
-axs[2].hist(returns, bins = 100)
-axs[2].set_title('Returns Histogram')
+    # Calculate returns
+    arr = np.array(price)
+    returns = np.diff(arr) / arr[:-1]
 
-# Adjust spacing between subplots
-plt.tight_layout()
-plt.show()
+    return price, returns, times, tokens_swapped, x_balances, y_balances, swap_types
+
+if __name__ == "__main__":
+    #Run simulation
+    price, returns, times, tokens_swapped, x_balances, y_balances, swap_types = run_simulation(steps = 10000)
+
+    # Print final balances of tokens in the AMM pool
+    print("Final balances:")
+    print(f"Token X: {x_balances[-1]}")
+    print(f"Token Y: {y_balances[-1]}")
+    # Print basic shape statistic of returns
+    stats = compute_statistics(returns)
+    print(stats)
+
+    # Compute and print DW test Autocorrelation outside of range (1.5, 2.5)
+    #print(f"DW test returns: {durbin_watson(returns)}, absolute returns: {durbin_watson(np.abs(returns))}")#, "  ", durbin_watson(df_rescaled.log_return_native)) #expect not to reject H0
+    #print(durbin_watson(np.abs(return_series)))
+    print("\n")
+    DW_result = compute_DW_test(returns)
+    print(DW_result)
+
+    # Plot the price and returns
+    # Create a figure with two subplots
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+
+    # Plot X in the first subplot
+    axs[0].plot(price)
+    axs[0].set_title('Price')
+
+    # Plot Y in the second subplot
+    axs[1].plot(returns)
+    axs[1].set_title('Returns')
+
+    axs[2].hist(returns, bins = 100)
+    axs[2].set_title('Returns Histogram')
+
+    # Adjust spacing between subplots
+    plt.tight_layout()
+    plt.show()
+
 
