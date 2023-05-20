@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from scipy.stats import skew, kurtosis
-from scipy.stats import halfgennorm, pareto, exponnorm, lognorm
+from scipy.stats import halfgennorm, pareto, exponnorm, lognorm, expon
 from scipy.special import expit, logit
 from statsmodels.stats.stattools import durbin_watson
 
@@ -86,7 +86,7 @@ def compute_DW_test(returns):
     DW_result = pd.DataFrame(data)
     return DW_result
 
-def run_simulation(steps = 100, x_balance = 1000000, y_balance = 10000):
+def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     # Set the AMM equation
     k = x_balance * y_balance
 
@@ -101,7 +101,7 @@ def run_simulation(steps = 100, x_balance = 1000000, y_balance = 10000):
     # Run simulation for 1000 steps
     for i in range(steps):
         # Generate random time between swaps from exponential distribution
-        time_to_next_swap = np.random.exponential(scale=1)
+        time_to_next_swap = float(expon.rvs(loc = 0, scale=300, size = 1))
         
         # Generate random transaction size from normal distribution
         transaction_size = generate_swapped_amount(method = 'exponnorm')
@@ -127,15 +127,38 @@ def run_simulation(steps = 100, x_balance = 1000000, y_balance = 10000):
         y_balances.append(y_balance)
         swap_types.append(int(is_buy))
 
-    # Calculate returns
-    arr = np.array(price)
-    returns = np.diff(arr) / arr[:-1]
+    # # Calculate returns
+    # arr = np.array(price)
+    # returns = np.diff(arr) / arr[:-1]
 
-    return price, returns, times, tokens_swapped, x_balances, y_balances, swap_types
+    return price, times, tokens_swapped, x_balances, y_balances, swap_types
+
+# Transform Tick-by-Tick prices to 5-miute blocks, using seconds in times list
+def transform_prices(prices, times):
+    start_time = pd.to_datetime('2023-03-19 08:00:00')
+    time_deltas = pd.to_timedelta(times, unit='s')
+    cumulative_sum = pd.Series(time_deltas).cumsum()
+    time_index = start_time + cumulative_sum
+
+    data = {'price': prices}
+    df = pd.DataFrame(data, index=time_index)
+    df = df.resample('5Min').last().fillna(method='ffill')
+    return df
 
 if __name__ == "__main__":
     #Run simulation
-    price, returns, times, tokens_swapped, x_balances, y_balances, swap_types = run_simulation(steps = 10000)
+    result = run_simulation(steps = 10000)
+    price, times, tokens_swapped, x_balances, y_balances, swap_types = result
+
+    # # Calculate TBT returns (not used anymore)
+    # arr = np.array(price)
+    # returns_tbt = np.diff(arr) / arr[:-1]
+
+    #calculate transformed returns
+    price_transformed = transform_prices(price, times)
+    returns = price_transformed.price.pct_change().fillna(0)
+
+    print(len(times), len(price) , price_transformed.shape  , returns.shape)
 
     # Print final balances of tokens in the AMM pool
     print("Final balances:")
@@ -146,14 +169,11 @@ if __name__ == "__main__":
     print(stats)
 
     # Compute and print DW test Autocorrelation outside of range (1.5, 2.5)
-    #print(f"DW test returns: {durbin_watson(returns)}, absolute returns: {durbin_watson(np.abs(returns))}")#, "  ", durbin_watson(df_rescaled.log_return_native)) #expect not to reject H0
-    #print(durbin_watson(np.abs(return_series)))
     print("\n")
     DW_result = compute_DW_test(returns)
     print(DW_result)
 
     # Plot the price and returns
-    # Create a figure with two subplots
     fig, axs = plt.subplots(1, 3, figsize=(12, 4))
 
     # Plot X in the first subplot
@@ -171,4 +191,10 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
 
+
+
+
+    # print(returns.head(10))
+    # print(returns.tail(10))
+    
 
