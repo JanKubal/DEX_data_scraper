@@ -8,30 +8,40 @@ from scipy.special import expit, logit
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
-#number of steps
-steps = 2000#25000
 
-
-# Set initial parameters
-x_balance = 1000000
-y_balance = 10000
-k = x_balance * y_balance
-
-# Set up arrays to store results
-times = []
-tokens_swapped = []
-x_balances = []
-y_balances = []
-price = []
-swap_types = []
-
-def generate_swapped_amount(method = 'exponnorm'):
+def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None, AR_params = None):
     #Very simple now, to be included: various distributions, some scale operator?
     if method == 'exponnorm':
         while True:
             x = exponnorm.rvs(K=4, loc=150, scale=150, size=1)
             if x > 0:
                 return float(x)
+            
+
+    if method == "AR":
+        AR_params = [0.2274293,  0.13147551, 0.09604017, 
+                        0.07126801, 0.06839098, 0.04348023, 
+                        0.02150476, 0.01732428, 0.02471407, 
+                        0.02150801, 0.00102558, 0.03491916]
+
+        p = len(AR_params)
+        if iter <= p:
+            while True:
+                x = exponnorm.rvs(K=4, loc=150, scale=150, size=1)
+                if x > 0:
+                    return float(x)
+                
+        else:
+            past_size = np.array(AR_params[-p:])
+
+            while True:
+                x = exponnorm.rvs(K=4, loc=75, scale=75, size=1)
+                if x >= 0:
+                    break
+
+            x = np.sum(past_size * np.array(AR_params)) + float(x)
+            return x
+
 
 def generate_swap_type(method = "random", past_swaps = None, iter = None,
                         AR_parameters = [0.2274293,  0.13147551, 0.09604017, 
@@ -48,8 +58,10 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None,
         if iter <= p:
             return np.random.choice([True, False])
         else:
+            #get p past values
             past_swaps = pd.Series(past_swaps[-p:])
 
+            #smoothe out labels
             transformed_series = pd.Series(logit(past_swaps.clip(1e-3, 1 - 1e-3)).values.ravel())
             #print(len(past_swaps), transformed_series)
 
@@ -61,10 +73,34 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None,
             probability = logit_probablity + error
             #print(logit_probablity, expit(logit_probablity), expit(probability), expit(probability) >= 0.5)
 
-            
-
-            #Here I left of. I added the autoregressive element to the BUY/SELL formation process. #TODO next - analyze what I can infer from the simulation, try some testing (??), write email to LK
+            #Return full probability (deterministic + random part). #Here pottential for better effectivity - not expit and compare against 0
             return expit(probability) >= 0.5
+
+def generate_swap_time(method = "expon", herding = False, iter = None, past_times = None):
+    if method == "expon":
+
+        if herding == False:
+            x = float(expon.rvs(loc = 0, scale=300, size = 1))
+            return x
+        else:
+            scale = 300
+            base_scale = 35
+            scaling_denominator = scale/(scale-base_scale)
+            past_window = 20
+
+            if iter <= past_window:
+                x = float(expon.rvs(loc = 0, scale=scale, size = 1))
+                return x         
+            else:      
+                average_scale = np.mean(past_times[-past_window:])/scaling_denominator #possibility to add weights here
+                new_time = float(expon.rvs(loc = 0, scale=base_scale, size = 1)) + float(expon.rvs(loc = 0, scale=average_scale, size = 1))
+                return new_time
+
+    else:
+        raise NameError
+
+
+
 
 def compute_statistics(series):
     data = {
@@ -102,16 +138,17 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     # Run simulation for 1000 steps
     for i in range(steps):
         # Generate random time between swaps from exponential distribution
-        time_to_next_swap = float(expon.rvs(loc = 0, scale=300, size = 1))
+        #time_to_next_swap = float(expon.rvs(loc = 0, scale=300, size = 1))
+        time_to_next_swap = generate_swap_time(method="expon", herding = True, iter=i, past_times = times)
         
         # Generate random transaction size from normal distribution
-        transaction_size = generate_swapped_amount(method = 'exponnorm')
+        transaction_size = generate_swapped_amount(method = 'exponnorm', past_size = tokens_swapped, iter=i)
         
         # Generate random transaction type (buy or sell)
         #setting custom AR parameters
-        #AR_parameter = [0.1,0.08,0.06]
-        AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
-        is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i)#, AR_parameters=AR_parameter)
+        AR_parameter = [0.1,0.08,0.06]
+        #AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
+        is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter)
 
         # Calculate price of transaction
         price.append(y_balance/x_balance)
@@ -197,22 +234,16 @@ if __name__ == "__main__":
     plt.show()
 
     f, ax = plt.subplots(nrows=1, ncols=2, figsize=(10,5))
-    plot_acf(returns, lags=35, ax=ax[0], title = "Returns")
-    plot_acf(np.abs(returns), lags=35, ax=ax[1], title = "Absolute Returns")
-    limit = 0.5
+    plot_acf(returns, lags=50, ax=ax[0], title = "Returns")
+    plot_acf(np.abs(returns), lags=50, ax=ax[1], title = "Absolute Returns")
+    limit = 0.6
     ax[0].set_ylim([-1*limit,limit]) 
     ax[1].set_ylim([-1*limit,limit]) 
 
     plt.tight_layout()
     plt.show()
     
-    ###Here is where I left of in the simulation. Currently, I get ok distribution of returns, but 
-    # and the DW test is good, but the ACF function show autocorr of returns and for absolute returns (????)
-    # autocorr. of returns is caused by the AR effects.
-    # TODO next: try creating some mechanism for large transaction detection and reaction. 
-    # This might lead to autocorr of absolute returns. Perhaps also try slippage
 
     # print(returns.head(10))
     # print(returns.tail(10))
     
-
