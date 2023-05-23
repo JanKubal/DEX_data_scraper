@@ -16,9 +16,14 @@ def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None,
             x = exponnorm.rvs(K=4, loc=150, scale=150, size=1)
             if x > 0:
                 return float(x)
-            
 
-    if method == "AR":
+    elif method == 'lognorm':
+        while True:
+            x = lognorm.rvs(s = 0.8, loc = -10, scale = 50, size = 1)
+            if x > 0:
+                return float(x)
+    
+    elif method == "AR":
         AR_params = [0.2274293,  0.13147551, 0.09604017, 
                         0.07126801, 0.06839098, 0.04348023, 
                         0.02150476, 0.01732428, 0.02471407, 
@@ -84,9 +89,9 @@ def generate_swap_time(method = "expon", herding = False, iter = None, past_time
             return x
         else:
             scale = 300
-            base_scale = 35
+            base_scale = 35    ###for exponnorm swap ammounts: base_scale = 35, past_window = 20
             scaling_denominator = scale/(scale-base_scale)
-            past_window = 20
+            past_window = 25
 
             if iter <= past_window:
                 x = float(expon.rvs(loc = 0, scale=scale, size = 1))
@@ -134,8 +139,9 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     y_balances = []
     price = []
     swap_types = []
+    slippage = []
 
-    # Run simulation for 1000 steps
+    # Run simulation for n steps
     for i in range(steps):
         # Generate random time between swaps from exponential distribution
         #time_to_next_swap = float(expon.rvs(loc = 0, scale=300, size = 1))
@@ -151,7 +157,8 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
         is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter)
 
         # Calculate price of transaction
-        price.append(y_balance/x_balance)
+        old_price = y_balance/x_balance
+        #price.append(old_price) #I am not sure what to do about slippage
 
         # Calculate new balances based on transaction
         if is_buy:
@@ -160,19 +167,19 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
         else:
             x_balance -= transaction_size
             y_balance = k / x_balance
+
+        new_price = y_balance/x_balance
         
         # Append results to arrays
+        price.append(new_price)
+        slippage.append(new_price/old_price - 1)
         times.append(time_to_next_swap)
         tokens_swapped.append(transaction_size)
         x_balances.append(x_balance)
         y_balances.append(y_balance)
         swap_types.append(int(is_buy))
 
-    # # Calculate returns
-    # arr = np.array(price)
-    # returns = np.diff(arr) / arr[:-1]
-
-    return price, times, tokens_swapped, x_balances, y_balances, swap_types
+    return price, times, tokens_swapped, x_balances, y_balances, swap_types, slippage
 
 # Transform Tick-by-Tick prices to 5-miute blocks, using seconds in times list
 def transform_prices(prices, times):
@@ -189,11 +196,11 @@ def transform_prices(prices, times):
 if __name__ == "__main__":
     #Run simulation
     result = run_simulation(steps = 10000)
-    price, times, tokens_swapped, x_balances, y_balances, swap_types = result
+    price, times, tokens_swapped, x_balances, y_balances, swap_types, slippage = result
 
-    # # Calculate TBT returns (not used anymore)
-    # arr = np.array(price)
-    # returns_tbt = np.diff(arr) / arr[:-1]
+    # Calculate TBT returns (not used anymore)
+    arr = np.array(price)
+    returns_tbt = np.diff(arr) / arr[:-1]
 
     #calculate transformed returns
     price_transformed = transform_prices(price, times)
@@ -242,8 +249,45 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.show()
-    
 
-    # print(returns.head(10))
-    # print(returns.tail(10))
-    
+    ###display slippage ###---it is return in fact!!
+    #print(slippage[0:50])
+    # stats_slip = compute_statistics(slippage)
+    # print(stats_slip)    
+    # plt.hist(slippage, bins=100)
+    # plt.show() #Does this have any sense doing? Whats the point?
+    # #A negative slippage that traders suffers due to price impact of his swap is positive returns for holders of the bought token
+
+
+
+    ###BUY/SELL examination
+            # swap_filter = [bool(element) for element in swap_types]
+
+            # sell_prices = np.array(price)[swap_filter]
+            # buy_prices = np.array(price)[np.logical_not(swap_filter)]
+
+            # print(len(price), len(buy_prices), len(sell_prices))
+
+            # # print(compute_statistics(sell_prices))
+            
+            # # print("\n")
+            # # print(compute_statistics(buy_prices))
+
+
+            # start_time = pd.to_datetime('2023-03-19 08:00:00')
+            # time_deltas = pd.to_timedelta(times, unit='s')
+            # cumulative_sum = pd.Series(time_deltas).cumsum()
+            # time_index = start_time + cumulative_sum
+
+
+            # time_index_sell = time_index[swap_filter]
+            # time_index_buy = time_index[np.logical_not(swap_filter)]
+
+            # plt.plot(time_index_sell, sell_prices, label='Sell Prices')
+            # plt.plot(time_index_buy, buy_prices, label='Buy Prices')
+
+            # plt.xlabel('Time')
+            # plt.ylabel('Price')
+            # plt.legend()
+
+            # plt.show()
