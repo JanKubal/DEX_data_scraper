@@ -7,6 +7,11 @@ from scipy.stats import halfgennorm, pareto, exponnorm, lognorm, expon
 from scipy.special import expit, logit
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from arch import arch_model
+
+import time
+# Start the timer
+start_time = time.time()
 
 
 def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None, AR_params = None):
@@ -23,7 +28,7 @@ def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None,
             if x > 0:
                 return float(x)
     
-    elif method == "AR":
+    elif method == "AR":  ###Dead end, DEPRECATED
         AR_params = [0.2274293,  0.13147551, 0.09604017, 
                         0.07126801, 0.06839098, 0.04348023, 
                         0.02150476, 0.01732428, 0.02471407, 
@@ -221,34 +226,42 @@ if __name__ == "__main__":
     DW_result = compute_DW_test(returns)
     print(DW_result)
 
-    # Plot the price and returns
-    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
 
-    # Plot X in the first subplot
-    axs[0].plot(price)
-    axs[0].set_title('Price')
+    ## Visual-check plots
+    do_plots = True
+    if do_plots:
+        # Plot the price and returns
+        fig, axs = plt.subplots(2, 3, figsize=(12, 8))
+        # Plot X in the first subplot
+        axs[0][0].plot(price)
+        axs[0][0].set_title('Price')
+        # Plot Y in the second subplot
+        axs[0][1].plot(returns)
+        axs[0][1].set_title('Returns')
+        axs[0][1].tick_params(axis='x', rotation=45)
+        #Plot histogram of returns
+        axs[0][2].hist(returns, bins = 100)
+        axs[0][2].set_title('Returns Histogram')
+        #Plot ACF and PACF
+        plot_acf(returns, lags=50, ax=axs[1][0], title = "Returns", marker = ".")
+        plot_acf(np.abs(returns), lags=50, ax=axs[1][1], title = "Absolute Returns", marker = ".")
+        limit = 0.5
+        axs[1][0].set_ylim([-1*limit,limit]) 
+        axs[1][1].set_ylim([-1*limit,limit]) 
+        plt.tight_layout()
+        plt.show()
 
-    # Plot Y in the second subplot
-    axs[1].plot(returns)
-    axs[1].set_title('Returns')
-    axs[1].tick_params(axis='x', rotation=45)
+    ##Estimate GARCH 
+    GARCH_switch = True #https://arch.readthedocs.io/en/latest/univariate/introduction.html
+    if GARCH_switch:
+        am = arch_model(y = returns, mean='Constant', vol="GARCH", dist='skewt', #'normal', 'studentst', 'skewt',
+                        p=1, o=0, q=1, rescale=True)
+        res = am.fit(disp="off")
+        summary_short = pd.concat([res.params, res.pvalues, res.pvalues.apply(lambda x: '*' if x < 0.05 else ' ')], axis=1)
 
-    axs[2].hist(returns, bins = 100)
-    axs[2].set_title('Returns Histogram')
-
-    # Adjust spacing between subplots
-    plt.tight_layout()
-    plt.show()
-
-    f, ax = plt.subplots(nrows=1, ncols=2, figsize=(10,5))
-    plot_acf(returns, lags=50, ax=ax[0], title = "Returns")
-    plot_acf(np.abs(returns), lags=50, ax=ax[1], title = "Absolute Returns")
-    limit = 0.6
-    ax[0].set_ylim([-1*limit,limit]) 
-    ax[1].set_ylim([-1*limit,limit]) 
-
-    plt.tight_layout()
-    plt.show()
+        print("GARCH")
+        print(summary_short)
+        print("\n")
 
     ###display slippage ###---it is return in fact!!
     #print(slippage[0:50])
@@ -291,3 +304,11 @@ if __name__ == "__main__":
             # plt.legend()
 
             # plt.show()
+
+
+# End the timer
+end_time = time.time()
+# Calculate the elapsed time
+elapsed_time = end_time - start_time
+# Print the runtime
+print(f"Runtime: {elapsed_time} seconds")
