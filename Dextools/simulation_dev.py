@@ -56,14 +56,11 @@ def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None,
 
 
 def generate_swap_type(method = "random", past_swaps = None, iter = None, past_times = None,
-                        AR_parameters = [0.2274293,  0.13147551, 0.09604017, 
-                        0.07126801, 0.06839098, 0.04348023, 
-                        0.02150476, 0.01732428, 0.02471407, 
-                        0.02150801, 0.00102558, 0.03491916]): #taken from MBOX estimation for now
+                        AR_parameters = None, AR_exog_params = None):
     if method == "random":
         return np.random.choice([True, False])
     
-    elif method == "AR":
+    elif method == "AR" or method == "AR_exog":
         #taking only last p values
         p = len(AR_parameters)
 
@@ -81,21 +78,20 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             logit_probablity = np.sum(np.array(transformed_series)*np.flipud(AR_parameters)*0.15)
             #defining random error
             error = np.random.normal(loc=0.0, scale=1.0, size=None)
+
+            #Adding the exogenous part
+            if method == "AR_exog":
+                past_times = pd.Series(past_times[-p:])
+                past_times_prob_componet = np.sum(np.array(past_times)*np.flipud(AR_exog_params)*0.15)
+                logit_probablity += past_times_prob_componet
+
             #computing probability
             probability = logit_probablity + error
             #print(logit_probablity, expit(logit_probablity), expit(probability), expit(probability) >= 0.5)
 
             #Return full probability (deterministic + random part). #Here pottential for better effectivity - not expit and compare against 0
             return expit(probability) >= 0.5
-    elif method == "AR_exog": #AR parameters and exogenous parameters should be of the same length
-        p = len(AR_parameters)#Here is potential inefficiency, I could call this outside of the forloop in the simulation function
-        AR_exog_params = [0.0004 - i * (0.0003 / (p - 1)) for i in range(p)] #a decreasing sequence between 0.0004 and 0.0001
 
-        if iter <= p:
-            return np.random.choice([True, False])
-        else:
-            pass#TODO continue here
-        pass
 
 def generate_swap_time(method = "expon", herding = False, iter = None, past_times = None):
     if method == "expon":
@@ -178,6 +174,13 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     swap_types = []
     slippage = []
 
+    #Defining AR parameters for swap direction
+    AR_parameter = [0.1,0.08,0.06]
+    #AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
+    #AR_parameter = [0.2274293,  0.13147551, 0.09604017, 0.07126801, 0.06839098, 0.04348023, 0.02150476, 0.01732428, 0.02471407, 0.02150801, 0.00102558, 0.03491916] ##MBOX
+    p = len(AR_parameter)#number of lags considered
+    AR_exog_params = [0.0004 - i * (0.0003 / (p - 1)) for i in range(p)]
+
     # Run simulation for n steps
     for i in range(steps):
         # Generate random time between swaps from exponential distribution
@@ -188,10 +191,7 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
         transaction_size = generate_swapped_amount(method = 'lognorm', past_size = tokens_swapped, iter=i)
         
         # Generate random transaction type (buy or sell)
-        #setting custom AR parameters
-        AR_parameter = [0.1,0.08,0.06]
-        #AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
-        is_buy = generate_swap_type(method = "AR", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter)
+        is_buy = generate_swap_type(method = "AR_exog", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter, past_times = times, AR_exog_params = AR_exog_params)
 
         # Calculate price of transaction
         old_price = y_balance/x_balance
@@ -257,6 +257,8 @@ if __name__ == "__main__":
     print("\n")
     DW_result = compute_DW_test(returns)
     print(DW_result)
+
+    print(f"BUYs: {100*np.sum(swap_types)/10000}%, SELLs: {100*(1-np.sum(swap_types)/10000)}%")
 
 
     ## Visual-check plots
