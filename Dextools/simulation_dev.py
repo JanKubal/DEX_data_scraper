@@ -107,11 +107,28 @@ def generate_swap_time(method = "expon", herding = False, iter = None, past_time
                 average_scale = np.mean(past_times[-past_window:])/scaling_denominator #possibility to add weights here
                 new_time = float(expon.rvs(loc = 0, scale=base_scale, size = 1)) + float(expon.rvs(loc = 0, scale=average_scale, size = 1))
                 return new_time
+            
     elif method == "pareto":
-        #r = pareto.rvs(b = 3, loc = -150, scale = 150, size=1) 
-        #r = pareto.rvs(b = 4, loc = -250, scale = 250, size=1)
-        x = float(pareto.rvs(b = 3, loc = -150, scale = 150, size=1))
-        return x
+        if herding == False:
+            #r = pareto.rvs(b = 3, loc = -150, scale = 150, size=1) 
+            #r = pareto.rvs(b = 4, loc = -250, scale = 250, size=1)
+            x = float(pareto.rvs(b = 3, loc = -150, scale = 150, size=1))
+            return x
+        else:
+            b = 3
+            scale = 150
+            base_scale = 35
+            scaling_denominator = scale/(scale-base_scale) #the scaling denominator computes the part of the scale that does not come from the base scale
+            past_window = 25
+            
+            if iter <= past_window:
+                x = float(pareto.rvs(b = b, loc = -scale, scale = scale, size=1))
+                return x
+            else:
+                average_scale = 2*np.mean(past_times[-past_window:])/scaling_denominator #the multiplication by 2 is here because in pareto dist, scale = mean*2
+                new_time = float(pareto.rvs(b = b, loc = -base_scale, scale = base_scale, size=1)) + float(pareto.rvs(b = b, loc = -average_scale, scale = average_scale, size=1))
+                return new_time
+
     else:
         raise NameError
 
@@ -156,7 +173,7 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     for i in range(steps):
         # Generate random time between swaps from exponential distribution
         #time_to_next_swap = float(expon.rvs(loc = 0, scale=300, size = 1))
-        time_to_next_swap = generate_swap_time(method="pareto", herding = False, iter=i, past_times = times)
+        time_to_next_swap = generate_swap_time(method="pareto", herding = True, iter=i, past_times = times)
         
         # Generate random transaction size from normal distribution
         transaction_size = generate_swapped_amount(method = 'lognorm', past_size = tokens_swapped, iter=i)
@@ -234,7 +251,7 @@ if __name__ == "__main__":
 
 
     ## Visual-check plots
-    do_plots = True
+    do_plots = False
     if do_plots:
         # Plot the price and returns
         fig, axs = plt.subplots(2, 3, figsize=(12, 8))
@@ -271,6 +288,7 @@ if __name__ == "__main__":
 
         print("GARCH")
         print(summary_short)
+        print(f"Alpha + Beta: {res.params[2]+res.params[3]}")
         print("\n")
 
     ###display slippage ###---it is return in fact!!
