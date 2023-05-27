@@ -55,7 +55,7 @@ def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None,
             return x
 
 
-def generate_swap_type(method = "random", past_swaps = None, iter = None,
+def generate_swap_type(method = "random", past_swaps = None, iter = None, past_times = None,
                         AR_parameters = [0.2274293,  0.13147551, 0.09604017, 
                         0.07126801, 0.06839098, 0.04348023, 
                         0.02150476, 0.01732428, 0.02471407, 
@@ -63,7 +63,7 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None,
     if method == "random":
         return np.random.choice([True, False])
     
-    if method == "AR":
+    elif method == "AR":
         #taking only last p values
         p = len(AR_parameters)
 
@@ -87,6 +87,15 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None,
 
             #Return full probability (deterministic + random part). #Here pottential for better effectivity - not expit and compare against 0
             return expit(probability) >= 0.5
+    elif method == "AR_exog": #AR parameters and exogenous parameters should be of the same length
+        p = len(AR_parameters)#Here is potential inefficiency, I could call this outside of the forloop in the simulation function
+        AR_exog_params = [0.0004 - i * (0.0003 / (p - 1)) for i in range(p)] #a decreasing sequence between 0.0004 and 0.0001
+
+        if iter <= p:
+            return np.random.choice([True, False])
+        else:
+            pass#TODO continue here
+        pass
 
 def generate_swap_time(method = "expon", herding = False, iter = None, past_times = None):
     if method == "expon":
@@ -251,7 +260,7 @@ if __name__ == "__main__":
 
 
     ## Visual-check plots
-    do_plots = False
+    do_plots = True
     if do_plots:
         # Plot the price and returns
         fig, axs = plt.subplots(2, 3, figsize=(12, 8))
