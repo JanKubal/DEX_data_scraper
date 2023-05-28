@@ -74,7 +74,7 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             #print(len(past_swaps), transformed_series)
 
             #computing the deterministic part based on past values and params
-            logit_probablity = np.sum(np.array(transformed_series)*np.flipud(AR_parameters)*0.1)
+            logit_probablity = np.sum(np.array(transformed_series)*np.flipud(AR_parameters)*-0.08)
             #defining random error
             error = np.random.normal(loc=0.0, scale=1.0, size=None)
 
@@ -82,7 +82,7 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             if method == "AR_exog":
                 exog_len = 3
                 past_times = pd.Series(past_times[-exog_len:])
-                past_times_prob_componet = np.sum((np.array(past_times))*np.flipud(AR_exog_params)*-0.05)
+                past_times_prob_componet = np.sum((np.array(past_times))*np.flipud(AR_exog_params)*0.05)
                 
                 # if iter % 100 == 0:
                 #     print(logit_probablity, past_times_prob_componet, expit(logit_probablity), expit(logit_probablity+past_times_prob_componet))
@@ -125,10 +125,10 @@ def generate_swap_time(method = "expon", herding = False, iter = None, past_time
             return x
         else:
             b = 3
-            scale = 200
-            base_scale = 50
+            scale = 150
+            base_scale = 65
             scaling_denominator = scale/(scale-base_scale) #the scaling denominator computes the part of the scale that does not come from the base scale
-            past_window = 50
+            past_window = 75
             
             if iter <= past_window:
                 x = float(pareto.rvs(b = b, loc = -scale, scale = scale, size=1))
