@@ -14,15 +14,48 @@ import time
 start_time = time.time()
 
 
-def generate_swapped_amount():
-    #x = lognorm.rvs(s = 1, loc = 0, scale = 200, size = 1) 
-    x = lognorm.rvs(s = 0.75, loc = 0, scale = 420, size = 1) 
-    #x = lognorm.rvs(s = 1.2, loc = 0, scale = 50, size = 1) #All these variants of lognormal work quite well
-    return float(x)
+def generate_swapped_amount(method = 'exponnorm', past_size = None, iter = None, AR_params = None):
+    #Very simple now, to be included: various distributions, some scale operator?
+    if method == 'exponnorm':
+        while True:
+            x = exponnorm.rvs(K=4, loc=150, scale=150, size=1)
+            if x > 0:
+                return float(x)
+
+    elif method == 'lognorm':
+        while True:
+            #x = lognorm.rvs(s = 1, loc = 0, scale = 200, size = 1) 
+            x = lognorm.rvs(s = 0.75, loc = 0, scale = 420, size = 1) 
+            #x = lognorm.rvs(s = 1.2, loc = 0, scale = 50, size = 1) #All these variants of lognormal work quite well
+            return float(x)
+    
+    elif method == "AR":  ###Dead end, DEPRECATED
+        AR_params = [0.2274293,  0.13147551, 0.09604017, 
+                        0.07126801, 0.06839098, 0.04348023, 
+                        0.02150476, 0.01732428, 0.02471407, 
+                        0.02150801, 0.00102558, 0.03491916]
+
+        p = len(AR_params)
+        if iter <= p:
+            while True:
+                x = exponnorm.rvs(K=4, loc=150, scale=150, size=1)
+                if x > 0:
+                    return float(x)
+                
+        else:
+            past_size = np.array(AR_params[-p:])
+
+            while True:
+                x = exponnorm.rvs(K=4, loc=75, scale=75, size=1)
+                if x >= 0:
+                    break
+
+            x = np.sum(past_size * np.array(AR_params)) + float(x)
+            return x
 
 
 def generate_swap_type(method = "random", past_swaps = None, iter = None, past_times = None,
-                        AR_parameters = None, AR_exog_params = None, exog_param_len = None):
+                        AR_parameters = None, AR_exog_params = None):
     if method == "random":
         return np.random.choice([True, False])
     
@@ -34,22 +67,22 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             return np.random.choice([True, False])
         else:
             #get p past values
-            past_swaps = np.array(past_swaps[-p:])
+            past_swaps = pd.Series(past_swaps[-p:])
 
             #smoothe out labels
-            #transformed_series = logit(past_swaps.clip(1e-3, 1 - 1e-3)).values.ravel()
-            transformed_series = logit(np.clip(past_swaps, 1e-3, 1 - 1e-3))#.values.ravel()
+            transformed_series = pd.Series(logit(past_swaps.clip(1e-3, 1 - 1e-3)).values.ravel())
             #print(len(past_swaps), transformed_series)
 
             #computing the deterministic part based on past values and params
-            logit_probablity = np.sum(transformed_series*np.flipud(AR_parameters)*0.1)
+            logit_probablity = np.sum(np.array(transformed_series)*np.flipud(AR_parameters)*0.1)
             #defining random error
-            error = np.random.normal() #(loc=0.0, scale=1.0, size=None) ##removing explicit statement of default values
+            error = np.random.normal(loc=0.0, scale=1.0, size=None)
 
             #Adding the exogenous part
             if method == "AR_exog":
-                past_times = np.array(past_times[-exog_param_len:])
-                past_times_prob_componet = np.sum(past_times*np.flipud(AR_exog_params)*-0.05)
+                exog_len = 3
+                past_times = pd.Series(past_times[-exog_len:])
+                past_times_prob_componet = np.sum((np.array(past_times))*np.flipud(AR_exog_params)*-0.05)
                 
                 # if iter % 100 == 0:
                 #     print(logit_probablity, past_times_prob_componet, expit(logit_probablity), expit(logit_probablity+past_times_prob_componet))
@@ -143,14 +176,15 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     y_balances = []
     price = []
     swap_types = []
+    #slippage = []
 
     #Defining AR parameters for swap direction
     #AR_parameter = [0.1,0.08,0.06]
     #AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
     #AR_parameter = [0.2,  0.16, 0.13, 0.10, 0.08, 0.06, 0.04, 0.03, 0.02, 0.015, 0.01, 0.005]
     AR_parameter = [0.1, 0.1, 0.1, 0.1, 0.09, 0.09, 0.09, 0.08, 0.08, 0.07,]
-    exog_param_len = 3#len(AR_parameter)#number of lags considered
-    AR_exog_params = [0.0004 - i * (0.0003 / (exog_param_len - 1)) for i in range(exog_param_len)]
+    p = 3#len(AR_parameter)#number of lags considered
+    AR_exog_params = [0.0004 - i * (0.0003 / (p - 1)) for i in range(p)]
 
     # Run simulation for n steps
     for i in range(steps):
@@ -159,11 +193,14 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
         time_to_next_swap = generate_swap_time(method="pareto", herding = True, iter=i, past_times = times)
         
         # Generate random transaction size from normal distribution
-        transaction_size = generate_swapped_amount()
+        transaction_size = generate_swapped_amount(method = 'lognorm', past_size = tokens_swapped, iter=i)
         
         # Generate random transaction type (buy or sell)
-        is_buy = generate_swap_type(method = "AR_exog", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter, past_times = times, 
-                                    AR_exog_params = AR_exog_params, exog_param_len = exog_param_len)
+        is_buy = generate_swap_type(method = "AR_exog", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter, past_times = times, AR_exog_params = AR_exog_params)
+
+        # Calculate price of transaction
+        old_price = y_balance/x_balance
+        #price.append(old_price) #I am not sure what to do about slippage
 
         # Calculate new balances based on transaction
         if is_buy:
@@ -177,13 +214,14 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
         
         # Append results to arrays
         price.append(new_price)
+        #slippage.append(new_price/old_price - 1)
         times.append(time_to_next_swap)
         tokens_swapped.append(transaction_size)
         x_balances.append(x_balance)
         y_balances.append(y_balance)
         swap_types.append(int(is_buy))
 
-    return price, times, tokens_swapped, x_balances, y_balances, swap_types
+    return price, times, tokens_swapped, x_balances, y_balances, swap_types#, slippage
 
 # Transform Tick-by-Tick prices to 5-miute blocks, using seconds in times list
 def transform_prices(prices, times):
@@ -229,7 +267,7 @@ if __name__ == "__main__":
 
 
     ## Visual-check plots
-    do_plots = False
+    do_plots = True
     if do_plots:
         # Plot the price and returns
         fig, axs = plt.subplots(2, 3, figsize=(12, 8))
