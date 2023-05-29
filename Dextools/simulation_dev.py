@@ -12,6 +12,7 @@ from arch import arch_model
 import time
 # Start the timer
 start_time = time.time()
+import multiprocessing
 
 
 def generate_swapped_amount():
@@ -22,7 +23,8 @@ def generate_swapped_amount():
 
 
 def generate_swap_type(method = "random", past_swaps = None, iter = None, past_times = None,
-                        AR_parameters = None, AR_exog_params = None, exog_param_len = None):
+                        AR_parameters = None, AR_exog_params = None, exog_param_len = None,
+                        AR_scale = 0.1, AR_exog_scale = 0.01):
     if method == "random":
         return np.random.choice([True, False])
     
@@ -42,14 +44,14 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             #print(len(past_swaps), transformed_series)
 
             #computing the deterministic part based on past values and params
-            logit_probablity = np.sum(transformed_series*np.flipud(AR_parameters)*0.1)
+            logit_probablity = np.sum(transformed_series*np.flipud(AR_parameters)*AR_scale)
             #defining random error
             error = np.random.normal() #(loc=0.0, scale=1.0, size=None) ##removing explicit statement of default values
 
             #Adding the exogenous part
             if method == "AR_exog":
                 past_times = np.array(past_times[-exog_param_len:])
-                past_times_prob_componet = np.sum(past_times*np.flipud(AR_exog_params)*-0.05)
+                past_times_prob_componet = np.sum(past_times*np.flipud(AR_exog_params)*AR_exog_scale)
                 
                 # if iter % 100 == 0:
                 #     print(logit_probablity, past_times_prob_componet, expit(logit_probablity), expit(logit_probablity+past_times_prob_componet))
@@ -64,7 +66,8 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             return probability >= 0 ##Here I skip expit conversion to lower performance difficulty
 
 
-def generate_swap_time(method = "expon", herding = False, iter = None, past_times = None):
+def generate_swap_time(method = "expon", herding = False, iter = None, past_times = None,
+                       scale = 150, base_scale = 35, window = 25):
     if method == "expon":
 
         if herding == False:
@@ -91,17 +94,17 @@ def generate_swap_time(method = "expon", herding = False, iter = None, past_time
             x = float(pareto.rvs(b = 3, loc = -150, scale = 150, size=1))
             return x
         else:
-            b = 3
-            scale = 200
-            base_scale = 50
+            b = 3 
+            #scale = 200  #I moved these to function argument
+            #base_scale = 50
             scaling_denominator = scale/(scale-base_scale) #the scaling denominator computes the part of the scale that does not come from the base scale
-            past_window = 50
+            #window = 50
             
-            if iter <= past_window:
+            if iter <= window:
                 x = float(pareto.rvs(b = b, loc = -scale, scale = scale, size=1))
                 return x
             else:
-                average_scale = 2*np.mean(past_times[-past_window:])/scaling_denominator #the multiplication by 2 is here because in pareto dist, scale = mean*2
+                average_scale = 2*np.mean(past_times[-window:])/scaling_denominator #the multiplication by 2 is here because in pareto dist, scale = mean*2
                 new_time = float(pareto.rvs(b = b, loc = -base_scale, scale = base_scale, size=1)) + float(pareto.rvs(b = b, loc = -average_scale, scale = average_scale, size=1))
                 return new_time
 
@@ -132,8 +135,10 @@ def compute_DW_test(returns):
     DW_result = pd.DataFrame(data)
     return DW_result
 
-def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
+def run_simulation(steps = 1000, parameters = None):
     # Set the AMM equation
+    x_balance = 1000000
+    y_balance = 10000
     k = x_balance * y_balance
 
     # Set up arrays to store results
@@ -148,7 +153,7 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     #AR_parameter = [0.1,0.08,0.06]
     #AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
     #AR_parameter = [0.2,  0.16, 0.13, 0.10, 0.08, 0.06, 0.04, 0.03, 0.02, 0.015, 0.01, 0.005]
-    AR_parameter = [0.1, 0.1, 0.1, 0.1, 0.09, 0.09, 0.09, 0.08, 0.08, 0.07,]
+    AR_parameter = [0.1, 0.1, 0.1, 0.1, 0.09, 0.09, 0.09, 0.08, 0.08, 0.07][0:parameters["AR_lags"]]
     exog_param_len = 3#len(AR_parameter)#number of lags considered
     AR_exog_params = [0.0004 - i * (0.0003 / (exog_param_len - 1)) for i in range(exog_param_len)]
 
@@ -156,14 +161,16 @@ def run_simulation(steps = 1000, x_balance = 1000000, y_balance = 10000):
     for i in range(steps):
         # Generate random time between swaps from exponential distribution
         #time_to_next_swap = float(expon.rvs(loc = 0, scale=300, size = 1))
-        time_to_next_swap = generate_swap_time(method="pareto", herding = True, iter=i, past_times = times)
+        time_to_next_swap = generate_swap_time(method="pareto", herding = True, iter=i, past_times = times, 
+                                               scale = parameters["scale"], base_scale = parameters["base_scale"], window = parameters["window"])
         
         # Generate random transaction size from normal distribution
         transaction_size = generate_swapped_amount()
         
         # Generate random transaction type (buy or sell)
         is_buy = generate_swap_type(method = "AR_exog", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter, past_times = times, 
-                                    AR_exog_params = AR_exog_params, exog_param_len = exog_param_len)
+                                    AR_exog_params = AR_exog_params, exog_param_len = exog_param_len,
+                                    AR_scale = parameters["AR_scale"], AR_exog_scale = parameters["AR_exog_scale"])
 
         # Calculate new balances based on transaction
         if is_buy:
@@ -197,35 +204,190 @@ def transform_prices(prices, times):
     df = df.resample('5Min').last().fillna(method='ffill')
     return df
 
+def meta_run(n_times = 10):
+    print("Simulation started")
+    skewenss_ls, kurtosis_ls = [], []
+    dw_returns, dw_abs_returns = [], []
+    alphas, alphas_pval = [], []
+    betas, betas_pval = [], []
+    gammas, gammas_pval = [], []
+    for i in range(n_times):
+        if i%5 == 0:
+            print(f"Run {i}/{n_times}")
+
+        ##Parameters of Scenario 2
+        parameters = {"scale": 200, "base_scale": 50, "window": 50, "AR_lags" : 10, "AR_scale" : 0.1, "AR_exog_scale" : -0.05}
+
+        #Trying multiprocessing
+        # with multiprocessing.Pool() as pool:
+        #     steps = 10000
+            
+        #     result = pool.starmap(run_simulation, [(steps, parameters) for _ in range(n_times)]) 
+
+        # print(len(result))
+        # for i in result:
+        #     print(type(i))
+
+        
+        
+        
+        
+        result = run_simulation(steps = 10000, parameters = parameters)
+        price, times, tokens_swapped, x_balances, y_balances, swap_types = result
+        ###To continue here. Create list of parameters and list of results. Save them after each run and create dataframe. Save it in csv.
+
+        #Transforming returns TBT -> 5min
+        price_transformed = transform_prices(price, times)
+        returns = price_transformed.price.pct_change().fillna(0)
+        
+        #Skewness and Kurtosis
+        skewenss, kurt = skew(returns), kurtosis(returns, fisher=True)
+        skewenss_ls.append(skewenss)
+        kurtosis_ls.append(kurt)
+        #Durbin Watson test for returns and absolute returns
+        dw_stat = durbin_watson(returns)
+        dw_abs_stat = durbin_watson(np.abs(returns))
+        dw_returns.append(dw_stat)
+        dw_abs_returns.append(dw_abs_stat)
+        #Garch model
+        am = arch_model(y = returns, mean='Constant', vol="GARCH", dist='skewt', #'normal', 'studentst', 'skewt',
+                        p=1, o=0, q=1, rescale=True)
+        res = am.fit(disp="off")
+        alphas.append(res.params[2])
+        alphas_pval.append(res.pvalues[2])
+        betas.append(res.params[3])
+        betas_pval.append(res.pvalues[3])
+        #HJR GARCH
+        am = arch_model(y = returns, mean='Constant', vol="GARCH", dist='skewt', #'normal', 'studentst', 'skewt',
+                p=1, o=1, q=1, rescale=True)
+        res = am.fit(disp="off")
+        gammas.append(res.params[3])
+        gammas_pval.append(res.pvalues[3])
+    
+    print("Simulation finished")
+    return skewenss_ls, kurtosis_ls, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval
+
+
+def meta_run_parallel(n_times = 10):
+    skewenss_ls, kurtosis_ls = [], []
+    dw_returns, dw_abs_returns = [], []
+    alphas, alphas_pval = [], []
+    betas, betas_pval = [], []
+    gammas, gammas_pval = [], []
+    #Scenario 2
+    parameters = {"scale": 200, "base_scale": 50, "window": 50, "AR_lags" : 10, "AR_scale" : 0.1, "AR_exog_scale" : -0.05}
+    #Pararell runs
+    with multiprocessing.Pool() as pool:
+        steps = 10000
+        
+        data_all_runs = pool.starmap(run_simulation, [(steps, parameters) for _ in range(n_times)]) 
+
+    for run in data_all_runs:
+        price, times, tokens_swapped, x_balances, y_balances, swap_types = run
+
+        #Transforming returns TBT -> 5min
+        price_transformed = transform_prices(price, times)
+        returns = price_transformed.price.pct_change().fillna(0)
+        
+        #Skewness and Kurtosis
+        skewenss, kurt = skew(returns), kurtosis(returns, fisher=True)
+        skewenss_ls.append(skewenss)
+        kurtosis_ls.append(kurt)
+        #Durbin Watson test for returns and absolute returns
+        dw_stat = durbin_watson(returns)
+        dw_abs_stat = durbin_watson(np.abs(returns))
+        dw_returns.append(dw_stat)
+        dw_abs_returns.append(dw_abs_stat)
+        #Garch model
+        am = arch_model(y = returns, mean='Constant', vol="GARCH", dist='skewt', #'normal', 'studentst', 'skewt',
+                        p=1, o=0, q=1, rescale=True)
+        res = am.fit(disp="off")
+        alphas.append(res.params[2])
+        alphas_pval.append(res.pvalues[2])
+        betas.append(res.params[3])
+        betas_pval.append(res.pvalues[3])
+        #HJR GARCH
+        am = arch_model(y = returns, mean='Constant', vol="GARCH", dist='skewt', #'normal', 'studentst', 'skewt',
+                p=1, o=1, q=1, rescale=True)
+        res = am.fit(disp="off")
+        gammas.append(res.params[3])
+        gammas_pval.append(res.pvalues[3])       
+
+    return skewenss_ls, kurtosis_ls, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval
+
+
 if __name__ == "__main__":
-    #Run simulation
-    result = run_simulation(steps = 10000)
-    price, times, tokens_swapped, x_balances, y_balances, swap_types = result
+    result = meta_run_parallel(n_times = 10) 
+    
+    do_parallel_run = True
+    if do_parallel_run:
+        run_n_times = 10
+        skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times)
+    
+    do_meta_run = False
+    if do_meta_run:
+        ##Run the metasimulation - Scenario 2
+        run_n_times = 10
+        skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run(n_times=run_n_times)
 
-    # Calculate TBT returns (not used anymore)
-    arr = np.array(price)
-    returns_tbt = np.diff(arr) / arr[:-1]
+    #It seems that parallelization works well - the results are almost the same, enough that it can be said that differences are due to randomness
+    #(tried on 50 and 100 runs). Parallelization saves half of the runtime
+        
+    print(f"Skewness mean: {round(np.mean(skewness_res), 5)}, stand.dev: {round(np.std(skewness_res), 5)}")
+    print(f"Kurtosis mean: {round(np.mean(kurtosis_res), 5)}, stand.dev: {round(np.std(kurtosis_res), 5)}")
+    print("~~~~~~-----------------~~~~~~")
+    print(f"DW test mean: {round(np.mean(dw_returns), 5)}, stand.dev: {round(np.std(dw_returns), 5)}")
+    print(f"DW absolute mean: {round(np.mean(dw_abs_returns), 5)}, stand.dev: {round(np.std(dw_abs_returns), 5)}")
+    print("~~~~~~-----------------~~~~~~")
+    print(f"Alphas mean: {round(np.mean(alphas), 5)}, stand.dev: {round(np.std(alphas), 5)}")
+    print(f"Betas absolute mean: {round(np.mean(betas), 5)}, stand.dev: {round(np.std(betas), 5)}")
+    ##Clearing alphas to only significant
+    print("......")
+    alphas_signif = [x for x, y in zip(alphas, alphas_pval) if y < 0.05]
+    betas_signif = [x for x, y in zip(betas, betas_pval) if y < 0.05]
+    print(f"Signif Alphas mean: {round(np.mean(alphas_signif), 5)}, stand.dev: {round(np.std(alphas_signif), 5)}, len {len(alphas_signif)}")
+    print(f"Signif Betas absolute mean: {round(np.mean(betas_signif), 5)}, stand.dev: {round(np.std(betas_signif), 5)}, len {len(betas_signif)}")
+    print("......")
+    gammas_signif = [x for x, y in zip(gammas, gammas_pval) if y < 0.05]
+    print(f"Gammas mean: {round(np.mean(gammas), 5)}, stand.dev: {round(np.std(gammas), 5)}")
+    print(f"Signif Gammas mean: {round(np.mean(gammas_signif), 5)}, stand.dev: {round(np.std(gammas_signif), 5)}, len {len(gammas_signif)}")
 
-    #calculate transformed returns
-    price_transformed = transform_prices(price, times)
-    returns = price_transformed.price.pct_change().fillna(0)
 
-    #print(len(times), len(price) , price_transformed.shape  , returns.shape)
 
-    # Print final balances of tokens in the AMM pool
-    print("Final balances:")
-    print(f"Token X: {x_balances[-1]}")
-    print(f"Token Y: {y_balances[-1]}")
-    # Print basic shape statistic of returns
-    stats = compute_statistics(returns)
-    print(stats)
 
-    # Compute and print DW test Autocorrelation outside of range (1.5, 2.5)
-    print("\n")
-    DW_result = compute_DW_test(returns)
-    print(DW_result)
+    ##Run a single simulation run for 10000 steps
+    single_run = False
+    if single_run:
+        ##Run simulation
+        #Parameters of Scenario 2
+        parameters = {"scale": 200, "base_scale": 50, "window": 50, "AR_lags" : 10, "AR_scale" : 0.1, "AR_exog_scale" : -0.05}
+        result = run_simulation(steps = 10000, parameters=parameters)
+        price, times, tokens_swapped, x_balances, y_balances, swap_types = result
 
-    print(f"BUYs: {100*np.sum(swap_types)/10000}%, SELLs: {100*(1-np.sum(swap_types)/10000)}%")
+        # Calculate TBT returns (not used anymore)
+        arr = np.array(price)
+        returns_tbt = np.diff(arr) / arr[:-1]
+
+        #calculate transformed returns
+        price_transformed = transform_prices(price, times)
+        returns = price_transformed.price.pct_change().fillna(0)
+
+        #print(len(times), len(price) , price_transformed.shape  , returns.shape)
+
+        # Print final balances of tokens in the AMM pool
+        print("Final balances:")
+        print(f"Token X: {x_balances[-1]}")
+        print(f"Token Y: {y_balances[-1]}")
+        # Print basic shape statistic of returns
+        stats = compute_statistics(returns)
+        print(stats)
+
+        # Compute and print DW test Autocorrelation outside of range (1.5, 2.5)
+        print("\n")
+        DW_result = compute_DW_test(returns)
+        print(DW_result)
+
+        print(f"BUYs: {100*np.sum(swap_types)/10000}%, SELLs: {100*(1-np.sum(swap_types)/10000)}%")
 
 
     ## Visual-check plots
@@ -257,7 +419,7 @@ if __name__ == "__main__":
         plt.show()
 
     ##Estimate GARCH 
-    GARCH_switch = True #https://arch.readthedocs.io/en/latest/univariate/introduction.html
+    GARCH_switch = False #https://arch.readthedocs.io/en/latest/univariate/introduction.html
     if GARCH_switch:
         am = arch_model(y = returns, mean='Constant', vol="GARCH", dist='skewt', #'normal', 'studentst', 'skewt',
                         p=1, o=0, q=1, rescale=True)
@@ -268,15 +430,6 @@ if __name__ == "__main__":
         print(summary_short)
         print(f"Alpha + Beta: {res.params[2]+res.params[3]}")
         print("\n")
-
-    ###display slippage ###---it is return in fact!!
-    #print(slippage[0:50])
-    # stats_slip = compute_statistics(slippage)
-    # print(stats_slip)    
-    # plt.hist(slippage, bins=100)
-    # plt.show() #Does this have any sense doing? Whats the point?
-    # #A negative slippage that traders suffers due to price impact of his swap is positive returns for holders of the bought token
-
 
 
     ###BUY/SELL examination
