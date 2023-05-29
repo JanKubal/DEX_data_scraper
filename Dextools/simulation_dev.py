@@ -13,6 +13,7 @@ import time
 # Start the timer
 start_time = time.time()
 import multiprocessing
+from tqdm import tqdm
 
 
 def generate_swapped_amount():
@@ -268,7 +269,7 @@ def meta_run(n_times = 10):
     return skewenss_ls, kurtosis_ls, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval
 
 
-def meta_run_parallel(n_times = 10):
+def meta_run_parallel(n_times = 10, save_df = False):
     skewenss_ls, kurtosis_ls = [], []
     dw_returns, dw_abs_returns = [], []
     alphas, alphas_pval = [], []
@@ -279,8 +280,14 @@ def meta_run_parallel(n_times = 10):
     #Pararell runs
     with multiprocessing.Pool() as pool:
         steps = 10000
-        
-        data_all_runs = pool.starmap(run_simulation, [(steps, parameters) for _ in range(n_times)]) 
+        #Use tqdm to create a progress bar
+        progress_bar = tqdm(total=n_times)  #Tracking progress - Check for older versions to reverse it back
+        def update_progress(*_):
+            progress_bar.update(1)
+        results = [pool.apply_async(run_simulation, args=(steps, parameters), callback=update_progress)
+                            for _ in range(n_times)]
+        data_all_runs = [result.get() for result in results]
+        progress_bar.close()
 
     for run in data_all_runs:
         price, times, tokens_swapped, x_balances, y_balances, swap_types = run
@@ -311,46 +318,75 @@ def meta_run_parallel(n_times = 10):
                 p=1, o=1, q=1, rescale=True)
         res = am.fit(disp="off")
         gammas.append(res.params[3])
-        gammas_pval.append(res.pvalues[3])       
+        gammas_pval.append(res.pvalues[3])   
 
-    return skewenss_ls, kurtosis_ls, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval
+    if save_df:
+        df = df = pd.DataFrame({
+                'Scale': [parameters["scale"]] * n_times,
+                'Base_scale': [parameters["base_scale"]] * n_times,
+                'Window': [parameters["window"]] * n_times,
+                'AR_lags': [parameters["AR_lags"]] * n_times,
+                'AR_scale': [parameters["AR_scale"]] * n_times,
+                'AR_exog_scale': [parameters["AR_exog_scale"]] * n_times,
+                'Skewness': skewenss_ls,
+                'Kurtosis': kurtosis_ls,
+                'DW': dw_returns,
+                'DW_absolute': dw_abs_returns,
+                'alphas': alphas,
+                'alphas_pval': alphas_pval,
+                'betas': betas,
+                'betas_pval': betas_pval,
+                'gammas': gammas,
+                'gammas_pval': gammas_pval,
+                })
+
+        return df
+    else:
+        return skewenss_ls, kurtosis_ls, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval
 
 
 if __name__ == "__main__":
-    result = meta_run_parallel(n_times = 10) 
-    
-    do_parallel_run = True
-    if do_parallel_run:
-        run_n_times = 10
-        skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times)
-    
-    do_meta_run = False
-    if do_meta_run:
-        ##Run the metasimulation - Scenario 2
-        run_n_times = 10
-        skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run(n_times=run_n_times)
 
-    #It seems that parallelization works well - the results are almost the same, enough that it can be said that differences are due to randomness
-    #(tried on 50 and 100 runs). Parallelization saves half of the runtime
+    #Run simulation and save data as .csv    
+    run_n_times = 10
+    simulated_data = meta_run_parallel(n_times = run_n_times, save_df=True)
+    name = f"Scenario2_{run_n_times}runs"
+    file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}.csv'
+    #file_path = f"D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/complete_data/{name}/{name}_complete.csv"
+    simulated_data.to_csv(file_path)
+
+    testing_metaruns = False
+    if testing_metaruns:
+        do_parallel_run = True
+        if do_parallel_run:
+            run_n_times = 10
+            skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times)
         
-    print(f"Skewness mean: {round(np.mean(skewness_res), 5)}, stand.dev: {round(np.std(skewness_res), 5)}")
-    print(f"Kurtosis mean: {round(np.mean(kurtosis_res), 5)}, stand.dev: {round(np.std(kurtosis_res), 5)}")
-    print("~~~~~~-----------------~~~~~~")
-    print(f"DW test mean: {round(np.mean(dw_returns), 5)}, stand.dev: {round(np.std(dw_returns), 5)}")
-    print(f"DW absolute mean: {round(np.mean(dw_abs_returns), 5)}, stand.dev: {round(np.std(dw_abs_returns), 5)}")
-    print("~~~~~~-----------------~~~~~~")
-    print(f"Alphas mean: {round(np.mean(alphas), 5)}, stand.dev: {round(np.std(alphas), 5)}")
-    print(f"Betas absolute mean: {round(np.mean(betas), 5)}, stand.dev: {round(np.std(betas), 5)}")
-    ##Clearing alphas to only significant
-    print("......")
-    alphas_signif = [x for x, y in zip(alphas, alphas_pval) if y < 0.05]
-    betas_signif = [x for x, y in zip(betas, betas_pval) if y < 0.05]
-    print(f"Signif Alphas mean: {round(np.mean(alphas_signif), 5)}, stand.dev: {round(np.std(alphas_signif), 5)}, len {len(alphas_signif)}")
-    print(f"Signif Betas absolute mean: {round(np.mean(betas_signif), 5)}, stand.dev: {round(np.std(betas_signif), 5)}, len {len(betas_signif)}")
-    print("......")
-    gammas_signif = [x for x, y in zip(gammas, gammas_pval) if y < 0.05]
-    print(f"Gammas mean: {round(np.mean(gammas), 5)}, stand.dev: {round(np.std(gammas), 5)}")
-    print(f"Signif Gammas mean: {round(np.mean(gammas_signif), 5)}, stand.dev: {round(np.std(gammas_signif), 5)}, len {len(gammas_signif)}")
+        do_meta_run = False
+        if do_meta_run:
+            ##Run the metasimulation - Scenario 2
+            run_n_times = 10
+            skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run(n_times=run_n_times)
+
+            
+        print(f"Skewness mean: {round(np.mean(skewness_res), 5)}, stand.dev: {round(np.std(skewness_res), 5)}")
+        print(f"Kurtosis mean: {round(np.mean(kurtosis_res), 5)}, stand.dev: {round(np.std(kurtosis_res), 5)}")
+        print("~~~~~~-----------------~~~~~~")
+        print(f"DW test mean: {round(np.mean(dw_returns), 5)}, stand.dev: {round(np.std(dw_returns), 5)}")
+        print(f"DW absolute mean: {round(np.mean(dw_abs_returns), 5)}, stand.dev: {round(np.std(dw_abs_returns), 5)}")
+        print("~~~~~~-----------------~~~~~~")
+        print(f"Alphas mean: {round(np.mean(alphas), 5)}, stand.dev: {round(np.std(alphas), 5)}")
+        print(f"Betas absolute mean: {round(np.mean(betas), 5)}, stand.dev: {round(np.std(betas), 5)}")
+        ##Clearing alphas to only significant
+        print("......")
+        alphas_signif = [x for x, y in zip(alphas, alphas_pval) if y < 0.05]
+        betas_signif = [x for x, y in zip(betas, betas_pval) if y < 0.05]
+        print(f"Signif Alphas mean: {round(np.mean(alphas_signif), 5)}, stand.dev: {round(np.std(alphas_signif), 5)}, len {len(alphas_signif)}")
+        print(f"Signif Betas absolute mean: {round(np.mean(betas_signif), 5)}, stand.dev: {round(np.std(betas_signif), 5)}, len {len(betas_signif)}")
+        print("......")
+        gammas_signif = [x for x, y in zip(gammas, gammas_pval) if y < 0.05]
+        print(f"Gammas mean: {round(np.mean(gammas), 5)}, stand.dev: {round(np.std(gammas), 5)}")
+        print(f"Signif Gammas mean: {round(np.mean(gammas_signif), 5)}, stand.dev: {round(np.std(gammas_signif), 5)}, len {len(gammas_signif)}")
 
 
 
