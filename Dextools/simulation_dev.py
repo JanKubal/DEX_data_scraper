@@ -14,6 +14,7 @@ import time
 start_time = time.time()
 import multiprocessing
 from tqdm import tqdm
+import datetime
 
 
 def generate_swapped_amount():
@@ -350,10 +351,10 @@ if __name__ == "__main__":
     #Run simulation and save data as .csv    
     run_n_times = 10
     simulated_data = meta_run_parallel(n_times = run_n_times, save_df=True)
-    name = f"Scenario2_{run_n_times}runs"
-    file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}.csv'
-    #file_path = f"D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/complete_data/{name}/{name}_complete.csv"
-    simulated_data.to_csv(file_path)
+    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M")  # Get current date, hours, and minutes
+    name = f"Scenario2_{run_n_times}runs_{current_time}.csv"
+    file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}'
+    simulated_data.to_csv(file_path, index=False)
 
     testing_metaruns = False
     if testing_metaruns:
