@@ -8,6 +8,7 @@ from scipy.special import expit, logit
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from arch import arch_model
+import random
 
 import time
 # Start the timer
@@ -27,14 +28,15 @@ def generate_swapped_amount():
 def generate_swap_type(method = "random", past_swaps = None, iter = None, past_times = None,
                         AR_parameters = None, AR_exog_params = None, exog_param_len = None,
                         AR_scale = 0.1, AR_exog_scale = 0.01):
-    if method == "random":
+    if method == "random" or len(AR_parameters) == 0:
         return np.random.choice([True, False])
     
     elif method == "AR" or method == "AR_exog":
         #taking only last p values
         p = len(AR_parameters)
 
-        if iter <= p:
+        if iter <= np.max((p, 3)):
+            #print(past_times)
             return np.random.choice([True, False])
         else:
             #get p past values
@@ -43,10 +45,10 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
             #smoothe out labels
             #transformed_series = logit(past_swaps.clip(1e-3, 1 - 1e-3)).values.ravel()
             transformed_series = logit(np.clip(past_swaps, 1e-3, 1 - 1e-3))#.values.ravel()
-            #print(len(past_swaps), transformed_series)
 
             #computing the deterministic part based on past values and params
             logit_probablity = np.sum(transformed_series*np.flipud(AR_parameters)*AR_scale)
+
             #defining random error
             error = np.random.normal() #(loc=0.0, scale=1.0, size=None) ##removing explicit statement of default values
 
@@ -58,6 +60,7 @@ def generate_swap_type(method = "random", past_swaps = None, iter = None, past_t
                 # if iter % 100 == 0:
                 #     print(logit_probablity, past_times_prob_componet, expit(logit_probablity), expit(logit_probablity+past_times_prob_componet))
                 logit_probablity += past_times_prob_componet
+
 
             #computing probability
             probability = logit_probablity + error
@@ -151,6 +154,17 @@ def run_simulation(steps = 1000, parameters = None):
     price = []
     swap_types = []
 
+    #Choose random parameters if None are given
+    if parameters is None:
+        parameters = {
+            "scale": random.uniform(100, 400),
+            "base_scale": random.uniform(30, 70),
+            "window": random.randint(20, 80),
+            "AR_lags": random.randint(0, 10),
+            "AR_scale": random.uniform(-0.1, 0.1),
+            "AR_exog_scale": random.uniform(-0.05, 0.05) 
+        }
+
     #Defining AR parameters for swap direction
     #AR_parameter = [0.1,0.08,0.06]
     #AR_parameter = [0.1,0,0,0,0,0,0,0,0,0,0,0.09,0,0,0,0,0,0,0,0,0,0,0.08]
@@ -192,7 +206,7 @@ def run_simulation(steps = 1000, parameters = None):
         y_balances.append(y_balance)
         swap_types.append(int(is_buy))
 
-    return price, times, tokens_swapped, x_balances, y_balances, swap_types
+    return parameters, price, times, tokens_swapped, x_balances, y_balances, swap_types
 
 # Transform Tick-by-Tick prices to 5-miute blocks, using seconds in times list
 def transform_prices(prices, times):
@@ -270,14 +284,27 @@ def meta_run(n_times = 10):
     return skewenss_ls, kurtosis_ls, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval
 
 
-def meta_run_parallel(n_times = 10, save_df = False):
+def meta_run_parallel(n_times = 10, save_df = False, scenario = None):
+    scales, base_scales, windows, AR_lags_ls, AR_scales, AR_exog_scales = [], [], [], [], [], []
     skewenss_ls, kurtosis_ls = [], []
     dw_returns, dw_abs_returns = [], []
     alphas, alphas_pval = [], []
     betas, betas_pval = [], []
     gammas, gammas_pval = [], []
-    #Scenario 2
-    parameters = {"scale": 200, "base_scale": 50, "window": 50, "AR_lags" : 10, "AR_scale" : 0.1, "AR_exog_scale" : -0.05}
+
+    #Parameter definition according to scenario
+    if scenario == "1": #Scenario 1
+        parameters = {"scale": 150, "base_scale": 65, "window": 75, "AR_lags" : 10, "AR_scale" : -0.08, "AR_exog_scale" : 0.05}
+    elif scenario == "2": #Scenario 2
+        parameters = {"scale": 200, "base_scale": 50, "window": 50, "AR_lags" : 10, "AR_scale" : 0.1, "AR_exog_scale" : -0.05}
+    elif scenario == "3": #Scenario 3
+        parameters = {"scale": 300, "base_scale": 35, "window": 25, "AR_lags" : 10, "AR_scale" : 0, "AR_exog_scale" : 0}
+    elif scenario == "random":
+        parameters = None
+    else:
+        raise ValueError("Invalid scenario parameter")
+
+
     #Pararell runs
     with multiprocessing.Pool() as pool:
         steps = 10000
@@ -291,7 +318,16 @@ def meta_run_parallel(n_times = 10, save_df = False):
         progress_bar.close()
 
     for run in data_all_runs:
-        price, times, tokens_swapped, x_balances, y_balances, swap_types = run
+        parameters, price, times, tokens_swapped, x_balances, y_balances, swap_types = run
+
+        #Unpacking parameters to list
+        scales.append(parameters["scale"])
+        base_scales.append(parameters["base_scale"])
+        windows.append(parameters["window"])
+        AR_lags_ls.append(parameters["AR_lags"])
+        AR_scales.append(parameters["AR_scale"])
+        AR_exog_scales.append(parameters["AR_exog_scale"])
+
 
         #Transforming returns TBT -> 5min
         price_transformed = transform_prices(price, times)
@@ -323,12 +359,12 @@ def meta_run_parallel(n_times = 10, save_df = False):
 
     if save_df:
         df = df = pd.DataFrame({
-                'Scale': [parameters["scale"]] * n_times,
-                'Base_scale': [parameters["base_scale"]] * n_times,
-                'Window': [parameters["window"]] * n_times,
-                'AR_lags': [parameters["AR_lags"]] * n_times,
-                'AR_scale': [parameters["AR_scale"]] * n_times,
-                'AR_exog_scale': [parameters["AR_exog_scale"]] * n_times,
+                'Scale': scales, 
+                'Base_scale': base_scales,
+                'Window': windows,
+                'AR_lags': AR_lags_ls,
+                'AR_scale': AR_scales,
+                'AR_exog_scale': AR_exog_scales,
                 'Skewness': skewenss_ls,
                 'Kurtosis': kurtosis_ls,
                 'DW': dw_returns,
@@ -348,20 +384,24 @@ def meta_run_parallel(n_times = 10, save_df = False):
 
 if __name__ == "__main__":
 
-    #Run simulation and save data as .csv    
-    run_n_times = 10
-    simulated_data = meta_run_parallel(n_times = run_n_times, save_df=True)
-    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M")  # Get current date, hours, and minutes
-    name = f"Scenario2_{run_n_times}runs_{current_time}.csv"
-    file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}'
-    simulated_data.to_csv(file_path, index=False)
+    scenario = "random" #"1", "2", "3", "random"
+
+    generating_data = True
+    if generating_data:
+        #Run simulation and save data as .csv    
+        run_n_times = 50
+        simulated_data = meta_run_parallel(n_times = run_n_times, save_df=True, scenario = scenario)
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M")  # Get current date, hours, and minutes
+        name = f"Scenario_{scenario}_{run_n_times}runs_{current_time}.csv"
+        file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}'
+        simulated_data.to_csv(file_path, index=False)
 
     testing_metaruns = False
     if testing_metaruns:
         do_parallel_run = True
         if do_parallel_run:
             run_n_times = 10
-            skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times)
+            skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times,  save_df=False, scenario = scenario)
         
         do_meta_run = False
         if do_meta_run:
@@ -369,7 +409,7 @@ if __name__ == "__main__":
             run_n_times = 10
             skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run(n_times=run_n_times)
 
-            
+        print(f"---Scenario_{scenario}---")
         print(f"Skewness mean: {round(np.mean(skewness_res), 5)}, stand.dev: {round(np.std(skewness_res), 5)}")
         print(f"Kurtosis mean: {round(np.mean(kurtosis_res), 5)}, stand.dev: {round(np.std(kurtosis_res), 5)}")
         print("~~~~~~-----------------~~~~~~")
