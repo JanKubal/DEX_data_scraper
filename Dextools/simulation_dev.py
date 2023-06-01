@@ -384,9 +384,9 @@ def meta_run_parallel(n_times = 10, save_df = False, scenario = None):
 
 if __name__ == "__main__":
 
-    scenario = "random" #"1", "2", "3", "random"
+    scenario = "1" #"1", "2", "3", "random"
 
-    generating_data = True
+    generating_data = False
     if generating_data:
         #Run simulation and save data as .csv    
         run_n_times = 50
@@ -396,11 +396,11 @@ if __name__ == "__main__":
         file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}'
         simulated_data.to_csv(file_path, index=False)
 
-    testing_metaruns = False
+    testing_metaruns = True
     if testing_metaruns:
         do_parallel_run = True
         if do_parallel_run:
-            run_n_times = 10
+            run_n_times = 30
             skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times,  save_df=False, scenario = scenario)
         
         do_meta_run = False
