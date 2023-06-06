@@ -190,10 +190,10 @@ def run_simulation(steps = 1000, parameters = None):
 
         # Calculate new balances based on transaction
         if is_buy:
-            x_balance += transaction_size
+            x_balance -= transaction_size
             y_balance = k / x_balance
         else:
-            x_balance -= transaction_size
+            x_balance += transaction_size
             y_balance = k / x_balance
 
         new_price = y_balance/x_balance
@@ -384,7 +384,7 @@ def meta_run_parallel(n_times = 10, save_df = False, scenario = None):
 
 if __name__ == "__main__":
 
-    scenario = "1" #"1", "2", "3", "random"
+    scenario = "3" #"1", "2", "3", "random"
 
     generating_data = False
     if generating_data:
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     if testing_metaruns:
         do_parallel_run = True
         if do_parallel_run:
-            run_n_times = 30
+            run_n_times = 50
             skewness_res, kurtosis_res, dw_returns, dw_abs_returns, alphas, alphas_pval, betas, betas_pval, gammas, gammas_pval = meta_run_parallel(n_times = run_n_times,  save_df=False, scenario = scenario)
         
         do_meta_run = False
