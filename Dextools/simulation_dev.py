@@ -20,7 +20,7 @@ import datetime
 
 def generate_swapped_amount():
     #x = lognorm.rvs(s = 1, loc = 0, scale = 200, size = 1) 
-    x = lognorm.rvs(s = 0.75, loc = 0, scale = 420, size = 1) 
+    x = lognorm.rvs(s = 0.75, loc = 0, scale = 300, size = 1) 
     #x = lognorm.rvs(s = 1.2, loc = 0, scale = 50, size = 1) #All these variants of lognormal work quite well
     return float(x)
 
@@ -182,6 +182,8 @@ def run_simulation(steps = 1000, parameters = None):
         
         # Generate random transaction size from normal distribution
         transaction_size = generate_swapped_amount()
+        #Adding Ad-Hoc fee of AMM swap
+        transaction_size = transaction_size*(1-0.4)
         
         # Generate random transaction type (buy or sell)
         is_buy = generate_swap_type(method = "AR_exog", past_swaps=swap_types, iter=i, AR_parameters=AR_parameter, past_times = times, 
@@ -396,7 +398,7 @@ if __name__ == "__main__":
         file_path = f'D:/Dokumenty/Vejška/Magisterské studium/DIPLOMKA/Code_and_Data/Data_scraping/DEX_data_scraper/simulated_data/{name}'
         simulated_data.to_csv(file_path, index=False)
 
-    testing_metaruns = True
+    testing_metaruns = False
     if testing_metaruns:
         do_parallel_run = True
         if do_parallel_run:
@@ -433,13 +435,14 @@ if __name__ == "__main__":
 
 
     ##Run a single simulation run for 10000 steps
-    single_run = False
+    single_run = True
     if single_run:
         ##Run simulation
         #Parameters of Scenario 2
         parameters = {"scale": 200, "base_scale": 50, "window": 50, "AR_lags" : 10, "AR_scale" : 0.1, "AR_exog_scale" : -0.05}
         result = run_simulation(steps = 10000, parameters=parameters)
-        price, times, tokens_swapped, x_balances, y_balances, swap_types = result
+        #price, times, tokens_swapped, x_balances, y_balances, swap_types = result
+        parameters, price, times, tokens_swapped, x_balances, y_balances, swap_types = result
 
         # Calculate TBT returns (not used anymore)
         arr = np.array(price)
@@ -468,7 +471,8 @@ if __name__ == "__main__":
 
 
     ## Visual-check plots
-    do_plots = False
+    do_plots = True
+
     if do_plots:
         # Plot the price and returns
         fig, axs = plt.subplots(2, 3, figsize=(12, 8))
